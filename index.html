@@ -1080,7 +1080,7 @@ select.form-control option { background:#1a1d24; }
 <!-- Firebase SDKs -->
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import { getDatabase, ref, set, get, push, onValue, update, remove }
   from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -1105,6 +1105,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 const provider = new GoogleAuthProvider();
+provider.setCustomParameters({ prompt: 'select_account' });
 
 let currentUser = null;
 let isLeader = false;
@@ -1113,13 +1114,41 @@ let allReminders = [];
 let allMembers = [];
 let allNotes = [];
 
+// ══ Handle redirect result (when popup was blocked) ══
+getRedirectResult(auth).then((result) => {
+  if(result && result.user) {
+    // Will be handled by onAuthStateChanged
+    console.log('Redirect login success:', result.user.email);
+  }
+}).catch((e) => {
+  if(e.code !== 'auth/no-auth-event') {
+    console.error('Redirect result error:', e);
+    toast("Login error: " + e.message, true);
+  }
+});
+
 // ══ AUTH ══
 window.loginWithGoogle = async () => {
+  const btn = document.querySelector('.btn-google');
+  if(btn) { btn.disabled = true; btn.style.opacity = '0.7'; btn.querySelector('strong').textContent = 'Signing in...'; }
   try {
+    // Try popup first — faster UX
     await signInWithPopup(auth, provider);
   } catch(e) {
-    toast("Login failed: " + e.message, true);
+    // If popup blocked or failed, use redirect
+    if(e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') {
+      try {
+        await signInWithRedirect(auth, provider);
+        // Page will redirect, no need to re-enable button
+        return;
+      } catch(e2) {
+        toast("Login failed: " + e2.message, true);
+      }
+    } else {
+      toast("Login failed: " + e.message, true);
+    }
   }
+  if(btn) { btn.disabled = false; btn.style.opacity = '1'; btn.querySelector('strong').textContent = 'Continue with Google'; }
 };
 
 window.logout = async () => {
@@ -1820,4 +1849,14 @@ function showScreen(name) {
 window.closeModal = (id) => document.getElementById(id).classList.remove('open');
 
 function toast(msg, isError=false) {
-  const el
+  const el = document.createElement('div');
+  el.className = 'toast' + (isError ? ' error' : '');
+  el.textContent = msg;
+  document.getElementById('toastContainer').appendChild(el);
+  setTimeout(() => el.style.opacity = '0', 2800);
+  setTimeout(() => el.remove(), 3200);
+}
+
+</script>
+</body>
+</html>
