@@ -1,0 +1,12 @@
+{
+  "name": "tps-client-desk-ai",
+  "version": "2.0.0",
+  "description": "Turning Point Solution — Client Desk AI. Smart Team Management. Powered by Wisefox Solution.",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . --cors"
+  },
+  "keywords": ["tps", "client-desk", "team-management", "wisefox"],
+  "author": "Wisefox Solution",
+  "license": "UNLICENSED"
+}
