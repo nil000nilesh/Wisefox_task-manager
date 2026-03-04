@@ -858,10 +858,14 @@ function subscribeReminders() {
   onValue(ref(db, 'reminders'), snap => {
     const raw = [];
     if (snap.exists()) snap.forEach(c => raw.push({id:c.key,...c.val()}));
-    if (currentRole === ROLES.MEMBER) {
-      allReminders = raw.filter(r => r.forEmail === currentUser.email || r.forEmail === 'all');
-    } else {
+    if (currentRole === ROLES.ADMIN) {
       allReminders = raw;
+    } else if (currentRole === ROLES.LEADER) {
+      allReminders = raw.filter(r => r.teamId === currentTeamId);
+    } else {
+      allReminders = raw.filter(r =>
+        (r.forEmail === currentUser.email || (r.forEmail === 'all' && r.teamId === currentTeamId))
+      );
     }
     renderReminders();
     renderMyReminders();
@@ -977,8 +981,10 @@ window.adminCreateTeam = async () => {
   if (!email || !email.includes('@')) return toast('Valid leader email required', true);
   try {
     const k = safeKey(email);
-    await set(ref(db, `roles/${k}`), {role:ROLES.LEADER, email, updatedAt:Date.now()});
-    await push(ref(db, 'teams'), {name, leaderEmail:email, createdAt:Date.now(), members:{}});
+    const teamRef = push(ref(db, 'teams'));
+    const teamId = teamRef.key;
+    await set(teamRef, {name, leaderEmail:email, createdAt:Date.now()});
+    await set(ref(db, `roles/${k}`), {role:ROLES.LEADER, email, teamId, updatedAt:Date.now()});
     toast(`✅ Team "${name}" created!`);
     ['newTeamName','newTeamLeader'].forEach(id => {const e=document.getElementById(id);if(e)e.value='';});
   } catch(e) { toast('Error: '+e.message, true); }
