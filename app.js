@@ -972,37 +972,55 @@ function initAdminModule() {
     renderAdminTeamList();
     populateAdminTeamSelect();
   });
+
+  // Bind admin buttons via addEventListener (reliable with ES modules)
+  const btnCreate = document.getElementById('btnCreateTeam');
+  if (btnCreate) btnCreate.addEventListener('click', adminCreateTeam);
+  const btnAdd = document.getElementById('btnAddMember');
+  if (btnAdd) btnAdd.addEventListener('click', adminAddMember);
 }
 
-window.adminCreateTeam = async () => {
-  const name  = document.getElementById('newTeamName')?.value.trim();
-  const email = document.getElementById('newTeamLeader')?.value.trim().toLowerCase();
-  if (!name) return toast('Team name required', true);
-  if (!email || !email.includes('@')) return toast('Valid leader email required', true);
+async function adminCreateTeam() {
   try {
+    const nameEl  = document.getElementById('newTeamName');
+    const emailEl = document.getElementById('newTeamLeader');
+    const name  = nameEl  ? nameEl.value.trim()  : '';
+    const email = emailEl ? emailEl.value.trim().toLowerCase() : '';
+    if (!name) return toast('Team name required', true);
+    if (!email || !email.includes('@')) return toast('Valid leader email required', true);
     const k = safeKey(email);
-    const teamRef = push(ref(db, 'teams'));
+    const teamRef = await push(ref(db, 'teams'), {name, leaderEmail:email, createdAt:Date.now()});
     const teamId = teamRef.key;
-    await set(teamRef, {name, leaderEmail:email, createdAt:Date.now()});
     await set(ref(db, `roles/${k}`), {role:ROLES.LEADER, email, teamId, updatedAt:Date.now()});
-    toast(`✅ Team "${name}" created!`);
-    ['newTeamName','newTeamLeader'].forEach(id => {const e=document.getElementById(id);if(e)e.value='';});
-  } catch(e) { toast('Error: '+e.message, true); }
-};
+    toast(`Team "${name}" created!`);
+    if (nameEl) nameEl.value = '';
+    if (emailEl) emailEl.value = '';
+  } catch(e) {
+    console.error('adminCreateTeam error:', e);
+    toast('Error: ' + (e.message || 'Unknown error'), true);
+  }
+}
+window.adminCreateTeam = adminCreateTeam;
 
-window.adminAddMember = async () => {
-  const email  = document.getElementById('newMemberEmailAdmin')?.value.trim().toLowerCase();
-  const teamId = document.getElementById('memberTeamSelect')?.value;
-  if (!email || !email.includes('@')) return toast('Valid email required', true);
-  if (!teamId) return toast('Select a team', true);
+async function adminAddMember() {
   try {
+    const emailEl  = document.getElementById('newMemberEmailAdmin');
+    const teamEl   = document.getElementById('memberTeamSelect');
+    const email  = emailEl ? emailEl.value.trim().toLowerCase() : '';
+    const teamId = teamEl  ? teamEl.value : '';
+    if (!email || !email.includes('@')) return toast('Valid email required', true);
+    if (!teamId) return toast('Select a team', true);
     const k = safeKey(email);
     await set(ref(db, `roles/${k}`), {role:ROLES.MEMBER, email, teamId, updatedAt:Date.now()});
     await set(ref(db, `teams/${teamId}/members/${k}`), {email, addedAt:Date.now()});
-    toast(`✅ ${email} added to team`);
-    document.getElementById('newMemberEmailAdmin').value = '';
-  } catch(e) { toast('Error: '+e.message, true); }
-};
+    toast(`${email} added to team`);
+    if (emailEl) emailEl.value = '';
+  } catch(e) {
+    console.error('adminAddMember error:', e);
+    toast('Error: ' + (e.message || 'Unknown error'), true);
+  }
+}
+window.adminAddMember = adminAddMember;
 
 window.adminChangeRole = async (email, role) => {
   await update(ref(db, `roles/${safeKey(email)}`), {role, updatedAt:Date.now()});
