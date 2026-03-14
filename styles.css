@@ -260,7 +260,7 @@ textarea.form-control { resize:vertical; }
 .modal-tab.active { background:var(--surface); color:var(--text); }
 
 /* FLOATING AI */
-#aiFloatBtn { position:fixed; bottom:28px; right:28px; z-index:90; width:56px; height:56px; background:linear-gradient(135deg,var(--accent),#00c97a); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; box-shadow:0 4px 20px rgba(0,229,160,0.4); border:none; transition:transform 0.2s,box-shadow 0.2s; }
+#aiFloatBtn { position:fixed; bottom:28px; right:28px; z-index:90; width:56px; height:56px; background:linear-gradient(135deg,var(--accent),#00c97a); border-radius:50%; display:none; align-items:center; justify-content:center; font-size:24px; cursor:pointer; box-shadow:0 4px 20px rgba(0,229,160,0.4); border:none; transition:transform 0.2s,box-shadow 0.2s; }
 #aiFloatBtn:hover { transform:scale(1.1); box-shadow:0 8px 32px rgba(0,229,160,0.5); }
 #aiFloatChat { position:fixed; bottom:96px; right:28px; z-index:90; width:360px; background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:0 8px 40px rgba(0,0,0,0.5); display:none; flex-direction:column; overflow:hidden; animation:slideUp 0.3s ease; }
 #aiFloatChat.open { display:flex; }
