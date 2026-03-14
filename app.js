@@ -529,7 +529,8 @@ function initApp() {
     initMemberModules(); showView('my-tasks');
   }
   initAIFloat();
-  setInterval(checkReminders, 60000);
+  setInterval(()=>{ checkReminders(); checkOverdueTasks(); }, 60000);
+  setTimeout(checkOverdueTasks, 5000); // initial check after 5s
   setupInactivityListeners();
   setupLiveNotifications();
   console.log('✅ App ready');
@@ -562,7 +563,7 @@ window.closeMobileSidebar = () => {
   document.querySelector('.hamburger')?.classList.remove('open');
 };
 function initLeaderModules(){subscribeMembers();subscribeTasks();subscribeClients();subscribeNotes();subscribeReminders();}
-function initMemberModules(){subscribeTasks();subscribeReminders();}
+function initMemberModules(){subscribeTasks();subscribeReminders();subscribeNotes();}
 
 // ═══════════════════════════════════════════════════════
 //  BROWSER PUSH NOTIFICATIONS
@@ -1036,9 +1037,18 @@ window.openNoteById = (id) => {
 };
 window.newNote = async () => {
   try {
-    const id=await dbPush('notes', {title:'',content:'',category:'',color:'#181c24',ownerKey:safeKey(currentUser.email),createdAt:Date.now(),updatedAt:Date.now(),createdBy:currentUser.email});
-    activeNoteId=id; setTimeout(()=>openNoteById(id),300);
-  } catch(e) { toast('Error: '+e.message,true); }
+    const noteRef = push(ref(db,'notes'));
+    const newId = noteRef.key;
+    const noteData = {id:newId, title:'', content:'', category:'', color:'#181c24', ownerKey:safeKey(currentUser.email), createdAt:Date.now(), updatedAt:Date.now(), createdBy:currentUser.email};
+    await set(noteRef, noteData);
+    // Optimistically add so openNoteById works immediately
+    if(!allNotes.find(n=>n.id===newId)) allNotes.unshift({...noteData});
+    activeNoteId = newId;
+    renderNoteList();
+    openNoteById(newId);
+    // Show editor, hide empty state
+    const empty=document.getElementById('noteEmptyState'); if(empty) empty.style.display='none';
+  } catch(e) { toast('Error: '+e.message, true); }
 };
 window.saveNote = async () => {
   if(!activeNoteId) return;
@@ -1131,7 +1141,8 @@ function checkReminders(){
   allReminders.forEach(r=>{
     if(r.status==='pending'&&r.time<=now&&r.time>now-70000){
       toast(`🔔 <strong>Reminder:</strong> ${r.title}`);
-      notifyBrowser('🔔 TPS Reminder — Tarningpoint', r.title, `rem-${r.id}`);
+      notifyBrowser('🔔 Reminder — Tarningpoint Marketing', r.title, `rem-${r.id}`);
+      showInAppNotif('🔔','Reminder — Abhi Karo!', r.title, 'reminder', null);
     }
   });
 }
@@ -1140,13 +1151,63 @@ function checkReminders(){
 function setupLiveNotifications(){
   onChildAdded(ref(db,`notifications/${safeKey(currentUser.email)}`), snap=>{
     const n=snap.val(); if(!n||n.read) return;
-    if(n.ts<=_appStartTime) return; // purane skip karo
+    if(n.ts<=_appStartTime) return;
     if(n.type==='chat'){
       notifyBrowser(`💬 ${n.from}: "${n.taskTitle}"`, n.text, `notif-${snap.key}`);
-      toast(`💬 <strong>${n.from}</strong> ne task pe message bheja: ${n.text?.substring(0,50)}`);
+      showInAppNotif('💬', `${n.from} ne message bheja`, `Task: "${n.taskTitle}" — ${n.text?.substring(0,80)}`, 'chat', n.taskId);
+    } else if(n.type==='task'){
+      notifyBrowser(`📋 Naya Task: "${n.taskTitle}"`, `By ${n.from}`, `notif-${snap.key}`);
+      showInAppNotif('📋', `Naya Task Assign Hua!`, `"${n.taskTitle}" — By ${n.from}`, 'task', n.taskId);
     }
-    // Mark read
     update(ref(db,`notifications/${safeKey(currentUser.email)}/${snap.key}`),{read:true}).catch(()=>{});
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  IN-APP NOTIFICATION POPUP
+// ═══════════════════════════════════════════════════════
+let _inAppNotifTaskId=null, _inAppNotifType=null, _inAppDismissTimer=null;
+
+function showInAppNotif(icon, title, msg, type='info', taskId=null){
+  const panel=document.getElementById('inAppNotifPanel'); if(!panel) return;
+  document.getElementById('inAppNotifIconWrap').textContent=icon;
+  document.getElementById('inAppNotifTitle').textContent=title;
+  document.getElementById('inAppNotifMsg').textContent=msg;
+  const viewBtn=document.getElementById('inAppViewBtn');
+  _inAppNotifTaskId=taskId; _inAppNotifType=type;
+  if(taskId){ viewBtn.style.display='inline-flex'; viewBtn.textContent=type==='chat'?'Chat Dekho':'Task Dekho'; }
+  else { viewBtn.style.display='none'; }
+  // Color by type
+  const card=document.getElementById('inAppNotifCard');
+  card.className='inapp-notif-card notif-'+type;
+  panel.style.display='flex';
+  clearTimeout(_inAppDismissTimer);
+  _inAppDismissTimer=setTimeout(()=>dismissInAppNotif(), 8000);
+}
+window.dismissInAppNotif=()=>{ const p=document.getElementById('inAppNotifPanel'); if(p) p.style.display='none'; clearTimeout(_inAppDismissTimer); };
+window.handleInAppAction=()=>{
+  dismissInAppNotif();
+  if(_inAppNotifType==='chat'&&_inAppNotifTaskId) openTaskUpdate(_inAppNotifTaskId);
+  else if(_inAppNotifType==='task'&&_inAppNotifTaskId) openTaskUpdate(_inAppNotifTaskId);
+  else if(_inAppNotifType==='reminder') showView(currentRole===ROLES.MEMBER?'my-reminders':'reminders');
+};
+
+// ═══════════════════════════════════════════════════════
+//  OVERDUE CHECKER — every 2 minutes
+// ═══════════════════════════════════════════════════════
+let _notifiedOverdue=new Set();
+function checkOverdueTasks(){
+  const now=Date.now();
+  allTasks.forEach(t=>{
+    if(t.status==='done'||_notifiedOverdue.has(t.id)) return;
+    if(t.dueDate && new Date(t.dueDate).getTime()<now){
+      const isMine=t.assigneeEmail===currentUser.email||t.createdBy===currentUser.email;
+      if(!isMine) return;
+      _notifiedOverdue.add(t.id);
+      const msg=`Task "${t.title}" overdue ho gayi! Assigned to: ${t.assigneeName||t.assigneeEmail}`;
+      notifyBrowser('⚠️ Task Overdue — TPS', msg, `overdue-${t.id}`);
+      showInAppNotif('⚠️','Task Overdue Ho Gayi!',`"${t.title}" — Due date nikal gayi. ${t.assigneeName||t.assigneeEmail} ne complete nahi kiya.`,'overdue',t.id);
+    }
   });
 }
 
@@ -1175,7 +1236,43 @@ function openAIChat(){
   chat.classList.add('open'); btn.style.display='none';
   const msgs=document.getElementById('aiFloatMessages');
   if(!msgs.children.length) addAIMsg(getWelcomeMsg(),false);
+  showAIChips();
 }
+function showAIChips(){ const c=document.getElementById('aiQuickChips'); if(c) c.style.display='flex'; }
+function hideAIChips(){ const c=document.getElementById('aiQuickChips'); if(c) c.style.display='none'; }
+
+// Quick action chips
+window.aiQuickAction = async (type) => {
+  hideAIChips();
+  if(type==='status'){ addAIMsg('📊 Status',true); showAITyping(); setTimeout(async()=>{ removeAITyping(); addAIMsg(await localAI('team status dikhao'),false); showAIChips(); },400); return; }
+
+  const memberList = allMembers.length ? allMembers.map((m,i)=>`<button class="ai-member-chip" onclick="aiSelectMember('${m.email}','${(m.name||m.email).replace(/'/g,"\\'")}','${type}')">${m.name||m.email}</button>`).join('') : '';
+  const selfBtn = `<button class="ai-member-chip ai-self-chip" onclick="aiSelectMember('self','Khud (Self)','${type}')">👤 Khud ke liye</button>`;
+
+  if(type==='task'){
+    addAIMsg('📋 Task — Kiske liye?',false);
+    const html=`<div class="ai-who-row">${selfBtn}${memberList}</div>`;
+    addAIRaw(html);
+  } else if(type==='reminder'){
+    addAIMsg('🔔 Reminder — Kiske liye?',false);
+    const html=`<div class="ai-who-row">${selfBtn}${memberList}<button class="ai-member-chip ai-all-chip" onclick="aiSelectMember('all','Sabko (All Team)','${type}')">👥 Sabko</button></div>`;
+    addAIRaw(html);
+  } else if(type==='note'){
+    addAIMsg('📝 Note ka content likho:',false);
+    const inp=document.getElementById('aiFloatInput');
+    if(inp){ inp.placeholder='Note content yahan likho...'; inp.focus(); inp.dataset.mode='note'; }
+  }
+};
+
+let _aiAssignTarget=null, _aiAssignName=null, _aiActionType=null;
+window.aiSelectMember = (email, name, type) => {
+  _aiAssignTarget=email; _aiAssignName=name; _aiActionType=type;
+  // Remove the who-row
+  const rows=document.querySelectorAll('.ai-who-row'); rows.forEach(r=>r.closest('.float-msg')?.remove());
+  addAIMsg(`👤 ${name} ke liye ${type==='task'?'📋 task':'🔔 reminder'} — Kya likhna hai?`,false);
+  const inp=document.getElementById('aiFloatInput');
+  if(inp){ inp.placeholder=type==='task'?'Task title likho...':'Reminder title likho...'; inp.dataset.mode=type; inp.focus(); }
+};
 function getWelcomeMsg(){
   const isLeaderOrAdmin = currentRole===ROLES.ADMIN||currentRole===ROLES.LEADER;
   const taskCmds = isLeaderOrAdmin
@@ -1185,11 +1282,77 @@ function getWelcomeMsg(){
 }
 window.sendAIChat = async () => {
   const input=document.getElementById('aiFloatInput'), msg=input.value.trim(); if(!msg) return;
+  const mode=input.dataset.mode||'';
   input.value=''; addAIMsg(msg,true); showAITyping();
-  setTimeout(async()=>{ const res=await processAI(msg); removeAITyping(); addAIMsg(res,false); },600);
+
+  // ── TASK via chip flow ──
+  if(mode==='task' && _aiAssignTarget){
+    removeAITyping();
+    const title=msg.trim(); if(!title){ addAIMsg('❌ Task title empty hai!',false); return; }
+    try{
+      if(_aiAssignTarget==='self'){
+        await dbPush('tasks',{title,desc:'',assigneeEmail:currentUser.email,assigneeName:currentUser.displayName||currentUser.email,priority:'medium',dueDate:'',status:'pending',teamId:currentTeamId||'',createdAt:Date.now(),createdBy:currentUser.email,createdByName:currentUser.displayName||currentUser.email,source:'ai-chat'});
+        addAIMsg(`✅ <strong>Task Create Ho Gaya!</strong><br/>📋 ${title}<br/>👤 Aap ke liye`,false);
+      } else {
+        const targets=_aiAssignTarget==='all'?allMembers:[allMembers.find(m=>m.email===_aiAssignTarget)||{email:_aiAssignTarget,name:_aiAssignName}];
+        for(const m of targets){
+          await dbPush('tasks',{title,desc:'',assigneeEmail:m.email,assigneeName:m.name||m.email,priority:'medium',dueDate:'',status:'pending',teamId:currentTeamId||'',createdAt:Date.now(),createdBy:currentUser.email,createdByName:currentUser.displayName||currentUser.email,source:'ai-chat'});
+          await dbPush(`notifications/${safeKey(m.email)}`,{type:'task',taskTitle:title,from:currentUser.displayName||currentUser.email,ts:Date.now(),read:false});
+        }
+        const who=_aiAssignTarget==='all'?`Sabko (${targets.length} members)`:(_aiAssignName||_aiAssignTarget);
+        addAIMsg(`✅ <strong>Task Assign Ho Gaya!</strong><br/>📋 ${title}<br/>👤 ${who}`,false);
+      }
+    }catch(e){ addAIMsg('❌ Error: '+e.message,false); }
+    input.dataset.mode=''; input.placeholder='Kuch bhi poochho ya bolo...';
+    _aiAssignTarget=null; _aiAssignName=null; _aiActionType=null;
+    showAIChips(); return;
+  }
+
+  // ── REMINDER via chip flow ──
+  if(mode==='reminder' && _aiAssignTarget){
+    removeAITyping();
+    const title=msg.trim(); if(!title){ addAIMsg('❌ Reminder title empty hai!',false); return; }
+    try{
+      if(_aiAssignTarget==='self'){
+        await dbPush(`reminders/${safeKey(currentUser.email)}`,{title,dueAt:'',repeat:'none',done:false,createdAt:Date.now(),createdBy:currentUser.email,assigneeEmail:currentUser.email,source:'ai-chat'});
+        addAIMsg(`✅ <strong>Reminder Set Ho Gaya!</strong><br/>🔔 ${title}<br/>👤 Aap ke liye`,false);
+      } else {
+        const targets=_aiAssignTarget==='all'?[{email:currentUser.email,name:currentUser.displayName},...allMembers]:[allMembers.find(m=>m.email===_aiAssignTarget)||{email:_aiAssignTarget,name:_aiAssignName}];
+        for(const m of targets){
+          await dbPush(`reminders/${safeKey(m.email)}`,{title,dueAt:'',repeat:'none',done:false,createdAt:Date.now(),createdBy:currentUser.email,assigneeEmail:m.email,source:'ai-chat'});
+          if(m.email!==currentUser.email) await dbPush(`notifications/${safeKey(m.email)}`,{type:'reminder',taskTitle:title,from:currentUser.displayName||currentUser.email,ts:Date.now(),read:false});
+        }
+        const who=_aiAssignTarget==='all'?`Sabko (${targets.length} log)`:(_aiAssignName||_aiAssignTarget);
+        addAIMsg(`✅ <strong>Reminder Set Ho Gaya!</strong><br/>🔔 ${title}<br/>👤 ${who}`,false);
+      }
+    }catch(e){ addAIMsg('❌ Error: '+e.message,false); }
+    input.dataset.mode=''; input.placeholder='Kuch bhi poochho ya bolo...';
+    _aiAssignTarget=null; _aiAssignName=null; _aiActionType=null;
+    showAIChips(); return;
+  }
+
+  // ── NOTE via chip flow ──
+  if(mode==='note'){
+    removeAITyping();
+    const content=msg.trim(); if(!content){ addAIMsg('❌ Note content empty hai!',false); return; }
+    try{
+      const noteRef=push(ref(db,'notes')); const noteId=noteRef.key;
+      const noteTitle=content.split('\n')[0].substring(0,60)||'AI Note';
+      const noteData={id:noteId,title:noteTitle,content,category:'',color:'#181c24',ownerKey:safeKey(currentUser.email),createdAt:Date.now(),updatedAt:Date.now(),createdBy:currentUser.email};
+      await set(noteRef,noteData);
+      if(!allNotes.find(n=>n.id===noteId)) allNotes.unshift({...noteData});
+      addAIMsg(`✅ <strong>Note Save Ho Gaya!</strong><br/>📝 ${noteTitle}`,false);
+    }catch(e){ addAIMsg('❌ Error: '+e.message,false); }
+    input.dataset.mode=''; input.placeholder='Kuch bhi poochho ya bolo...';
+    showAIChips(); return;
+  }
+
+  // ── DEFAULT: normal AI processing ──
+  setTimeout(async()=>{ const res=await processAI(msg); removeAITyping(); addAIMsg(res,false); showAIChips(); },600);
 };
 window.aiFloatKeyDown = (e) => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAIChat();} };
 function addAIMsg(text,isUser){ const el=document.getElementById('aiFloatMessages'); const div=document.createElement('div'); div.className='float-msg'+(isUser?' user':''); div.innerHTML=`<div class="float-bubble">${text}</div>`; el.appendChild(div); el.scrollTop=el.scrollHeight; }
+function addAIRaw(html){ const el=document.getElementById('aiFloatMessages'); const div=document.createElement('div'); div.className='float-msg'; div.innerHTML=html; el.appendChild(div); el.scrollTop=el.scrollHeight; }
 let typingEl=null;
 function showAITyping(){ const el=document.getElementById('aiFloatMessages'); typingEl=document.createElement('div'); typingEl.className='float-msg'; typingEl.innerHTML='<div class="float-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>'; el.appendChild(typingEl); el.scrollTop=el.scrollHeight; }
 function removeAITyping(){ if(typingEl){ typingEl.remove(); typingEl=null; } }
