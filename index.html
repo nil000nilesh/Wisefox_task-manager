@@ -18,7 +18,14 @@
   <div class="login-left">
     <div class="login-left-brand">
       <div class="login-left-logo" aria-hidden="true">
-        <div class="tp-monogram">T</div>
+        <svg viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg" width="38" height="38">
+          <defs><linearGradient id="gLL" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff41f"/><stop offset="50%" stop-color="#ffc931"/><stop offset="100%" stop-color="#ff6b1a"/></linearGradient></defs>
+          <rect x="1" y="2" width="42" height="13" rx="5" fill="url(#gLL)"/>
+          <path d="M17 15 L15 37 L29 37 L27 15 Z" fill="url(#gLL)"/>
+          <path d="M24.5 2 C26 5 27 10 27 15 L29 15 C29 9 27 4 24 2 Z" fill="#ff3d00"/>
+          <ellipse cx="22" cy="40" rx="11" ry="3.5" fill="url(#gLL)" opacity="0.65"/>
+          <rect x="11" y="43.5" width="22" height="5" rx="2.5" fill="url(#gLL)" opacity="0.4"/>
+        </svg>
       </div>
       <div>
         <div class="login-left-title">TARNINGPOINT</div>
@@ -45,7 +52,15 @@
     <div class="login-right-inner">
       <!-- Mobile-only brand header -->
       <div class="login-mobile-brand">
-        <div class="login-mobile-logo"><div class="tp-monogram">T</div></div>
+        <div class="login-mobile-logo">
+          <svg viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg" width="32" height="32">
+            <defs><linearGradient id="gML" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff41f"/><stop offset="50%" stop-color="#ffc931"/><stop offset="100%" stop-color="#ff6b1a"/></linearGradient></defs>
+            <rect x="1" y="2" width="42" height="13" rx="5" fill="url(#gML)"/>
+            <path d="M17 15 L15 37 L29 37 L27 15 Z" fill="url(#gML)"/>
+            <path d="M24.5 2 C26 5 27 10 27 15 L29 15 C29 9 27 4 24 2 Z" fill="#ff3d00"/>
+            <ellipse cx="22" cy="40" rx="11" ry="3.5" fill="url(#gML)" opacity="0.65"/>
+          </svg>
+        </div>
         <div>
           <div class="login-mobile-title">TARNINGPOINT</div>
           <div class="login-mobile-tag">MARKETING</div>
@@ -85,7 +100,17 @@
     <button class="hamburger" onclick="toggleMobileSidebar()" aria-label="Menu">
       <span></span><span></span><span></span>
     </button>
-    <div class="mobile-topbar-brand">🎯 <strong>TPS</strong> <span>Client Desk</span></div>
+    <div class="mobile-topbar-brand">
+      <svg class="tp-icon-sm" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="gMT" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff41f"/><stop offset="50%" stop-color="#ffc931"/><stop offset="100%" stop-color="#ff6b1a"/></linearGradient></defs>
+        <rect x="1" y="2" width="42" height="13" rx="5" fill="url(#gMT)"/>
+        <path d="M17 15 L15 37 L29 37 L27 15 Z" fill="url(#gMT)"/>
+        <path d="M24.5 2 C26 5 27 10 27 15 L29 15 C29 9 27 4 24 2 Z" fill="#ff3d00"/>
+        <ellipse cx="22" cy="40" rx="11" ry="3.5" fill="url(#gMT)" opacity="0.65"/>
+        <rect x="11" y="43.5" width="22" height="5" rx="2.5" fill="url(#gMT)" opacity="0.4"/>
+      </svg>
+      <div class="mobile-brand-text"><strong>TARNING<span>POINT</span></strong><small>MARKETING</small></div>
+    </div>
     <div class="mobile-topbar-right">
       <button class="mobile-share-btn" onclick="shareApp()" title="Share">🔗</button>
       <div class="user-avatar mobile-avatar" id="mobileAvatar">?</div>
@@ -95,7 +120,20 @@
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeMobileSidebar()"></div>
   <aside class="sidebar" id="mainSidebar">
     <div class="sidebar-brand">
-      <div class="logo">🎯 TPS</div><div class="sub">Client Desk AI</div>
+      <div class="tp-logo-wrap">
+        <svg class="tp-logo-svg" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="gSB" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff41f"/><stop offset="50%" stop-color="#ffc931"/><stop offset="100%" stop-color="#ff6b1a"/></linearGradient></defs>
+          <rect x="1" y="2" width="42" height="13" rx="5" fill="url(#gSB)"/>
+          <path d="M17 15 L15 37 L29 37 L27 15 Z" fill="url(#gSB)"/>
+          <path d="M24.5 2 C26 5 27 10 27 15 L29 15 C29 9 27 4 24 2 Z" fill="#ff3d00"/>
+          <ellipse cx="22" cy="40" rx="11" ry="3.5" fill="url(#gSB)" opacity="0.65"/>
+          <rect x="11" y="43.5" width="22" height="5" rx="2.5" fill="url(#gSB)" opacity="0.4"/>
+        </svg>
+      </div>
+      <div class="tp-brand-name-wrap">
+        <div class="tp-brand-name">TARNING<span>POINT</span></div>
+        <div class="tp-brand-sub">MARKETING</div>
+      </div>
       <button class="sidebar-close-btn" onclick="closeMobileSidebar()" title="Close">✕</button>
     </div>
     <div class="sidebar-user">
@@ -129,12 +167,25 @@
   <main class="main-content">
     <!-- DASHBOARD -->
     <div id="view-dashboard" class="view active">
-      <div class="page-header">
-        <div>
+      <div class="page-header dash-header">
+        <div class="dash-header-left">
+          <div class="dash-brand-row">
+            <svg class="dash-tp-icon" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs><linearGradient id="gDB" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#fff41f"/><stop offset="50%" stop-color="#ffc931"/><stop offset="100%" stop-color="#ff6b1a"/></linearGradient></defs>
+              <rect x="1" y="2" width="42" height="13" rx="5" fill="url(#gDB)"/>
+              <path d="M17 15 L15 37 L29 37 L27 15 Z" fill="url(#gDB)"/>
+              <path d="M24.5 2 C26 5 27 10 27 15 L29 15 C29 9 27 4 24 2 Z" fill="#ff3d00"/>
+              <ellipse cx="22" cy="40" rx="11" ry="3.5" fill="url(#gDB)" opacity="0.65"/>
+              <rect x="11" y="43.5" width="22" height="5" rx="2.5" fill="url(#gDB)" opacity="0.4"/>
+            </svg>
+            <div class="dash-brand-label">TARNINGPOINT <span>MARKETING</span></div>
+          </div>
           <div class="page-title">Good day, <span id="dashName">Leader</span> 👋</div>
           <div class="page-sub">Team overview for today</div>
         </div>
-        <button class="btn-sm btn-share" onclick="shareApp()" title="Share this app">🔗 Share App</button>
+        <button class="btn-share-dash" onclick="shareApp()" title="Share this app">
+          <span>🔗</span> Share App
+        </button>
       </div>
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Total Tasks</div><div class="stat-value blue" id="statTotal">0</div></div>
