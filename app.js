@@ -1023,7 +1023,13 @@ function openAIChat(){
   const msgs=document.getElementById('aiFloatMessages');
   if(!msgs.children.length) addAIMsg(getWelcomeMsg(),false);
 }
-function getWelcomeMsg(){ return`<strong>TPS AI Assistant</strong> — <span style="color:var(--accent)">Wisefox Solution</span> 🦊<br/><br/>Main kya kar sakta hoon:<br/>• 📝 <strong>Note:</strong> "Note: Client call Friday 4pm"<br/>• 📋 <strong>Task:</strong> "Rahul ko task do, due 30 June, high priority"<br/>• 🔔 <strong>Reminder:</strong> "Kal 9 baje meeting reminder"<br/>• 📊 <strong>Status:</strong> "Team ka status dikhao"<br/><br/>💡 Hindi, English, Hinglish — sab samajhta hoon!`; }
+function getWelcomeMsg(){
+  const isLeaderOrAdmin = currentRole===ROLES.ADMIN||currentRole===ROLES.LEADER;
+  const taskCmds = isLeaderOrAdmin
+    ? `• 📋 <strong>Task assign:</strong> "Rahul ko task do: printer install, due 30 June, high priority"<br/>• 📋 <strong>Task assign:</strong> "Priya ko website update task assign karo"<br/>• 📋 <strong>Members list:</strong> "Members dikhao"<br/>`
+    : `• 📋 <strong>Tasks:</strong> "Mera task status dikhao"<br/>`;
+  return`<strong>TPS AI Assistant</strong> — <span style="color:var(--accent)">Wisefox Solution</span> 🦊<br/><br/>Main kya kar sakta hoon:<br/>${taskCmds}• 📝 <strong>Note:</strong> "Note: Client call Friday 4pm"<br/>• 🔔 <strong>Reminder:</strong> "Kal 9 baje meeting reminder"<br/>• 📊 <strong>Status:</strong> "Team ka status dikhao"<br/><br/>💡 Hindi, English, Hinglish — sab samajhta hoon!`;
+}
 window.sendAIChat = async () => {
   const input=document.getElementById('aiFloatInput'), msg=input.value.trim(); if(!msg) return;
   input.value=''; addAIMsg(msg,true); showAITyping();
@@ -1034,7 +1040,7 @@ function addAIMsg(text,isUser){ const el=document.getElementById('aiFloatMessage
 let typingEl=null;
 function showAITyping(){ const el=document.getElementById('aiFloatMessages'); typingEl=document.createElement('div'); typingEl.className='float-msg'; typingEl.innerHTML='<div class="float-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>'; el.appendChild(typingEl); el.scrollTop=el.scrollHeight; }
 function removeAITyping(){ if(typingEl){ typingEl.remove(); typingEl=null; } }
-async function processAI(msg){ const key=await getApiKey(); if(key) return callOpenAI(msg,key); return localAI(msg); }
+async function processAI(msg){ const key=await getApiKey(); if(key) return callOpenAI(msg,key); return await localAI(msg); }
 async function getApiKey(){
   if(cachedApiKey) return cachedApiKey;
   try { const d=await dbGet('settings/config'); if(d?.openaiApiKey){ cachedApiKey=d.openaiApiKey; return cachedApiKey; } } catch(e) {}
@@ -1052,11 +1058,76 @@ async function callOpenAI(msg,apiKey){
 }
 async function execAIAction(a,orig){
   if(a.action==='note'){ const content=a.content||orig; await dbPush('notes',{content,title:content.substring(0,30),category:'',color:'#181c24',ownerKey:safeKey(currentUser.email),createdAt:Date.now(),updatedAt:Date.now(),createdBy:currentUser.email}); return`✅ <strong>Note saved!</strong><br/>"${content}"`; }
-  if(a.action==='task'){ const m=allMembers.find(m=>(m.name||'').toLowerCase().includes((a.assigneeName||'').toLowerCase())||m.email.includes((a.assigneeName||'').toLowerCase())); if(!m) return`❌ Member nahi mila: "${a.assigneeName}"<br/>Available: ${allMembers.map(m=>m.name||m.email).join(',')||'No members'}`; await dbPush('tasks',{title:a.title,desc:a.description||'',assigneeEmail:m.email,assigneeName:m.name||m.email,priority:a.priority||'medium',dueDate:a.dueDate||'',status:'pending',teamId:currentTeamId||'',createdAt:Date.now(),createdBy:currentUser.email,source:'ai'}); return`✅ <strong>Task!</strong> 📋 ${a.title} 👤 ${m.name||m.email}`; }
+  if(a.action==='task'){
+    if(currentRole!==ROLES.ADMIN&&currentRole!==ROLES.LEADER) return`❌ Sirf Leader aur Admin task assign kar sakte hain.`;
+    const m=allMembers.find(m=>(m.name||'').toLowerCase().includes((a.assigneeName||'').toLowerCase())||m.email.includes((a.assigneeName||'').toLowerCase()));
+    if(!m) return`❌ Member nahi mila: "${a.assigneeName}"<br/>Available: ${allMembers.map(m=>m.name||m.email).join(', ')||'No members'}`;
+    await dbPush('tasks',{title:a.title,desc:a.description||'',assigneeEmail:m.email,assigneeName:m.name||m.email,priority:a.priority||'medium',dueDate:a.dueDate||'',status:'pending',teamId:currentTeamId||'',createdAt:Date.now(),createdBy:currentUser.email,createdByName:currentUser.displayName||currentUser.email,source:'ai-chat'});
+    return`✅ <strong>Task Assign Ho Gaya!</strong><br/>📋 ${a.title}<br/>👤 ${m.name||m.email}<br/>🚨 Priority: ${a.priority||'medium'}${a.dueDate?`<br/>📅 Due: ${a.dueDate}`:''}`;
+  }
   if(a.action==='reminder'){ const t=Date.now()+((parseFloat(a.hoursFromNow)||1)*3600000); await dbPush('reminders',{title:a.title,time:t,forEmail:'all',status:'pending',createdAt:Date.now(),createdBy:currentUser.email}); return`✅ <strong>Reminder!</strong> 🔔 "${a.title}" ⏰ ${new Date(t).toLocaleString()}`; }
   return '🤔 Unknown action';
 }
-function localAI(msg){ const l=msg.toLowerCase(); if(l.includes('status')||l.includes('report')||l.includes('kitne')){ const done=allTasks.filter(t=>t.status==='done').length; return`📊 <strong>Team Status</strong><br/>Total: ${allTasks.length} | ✅ Done: ${done} | 🔄 Pending: ${allTasks.length-done}<br/>Clients: ${allClients.length} | Members: ${allMembers.length}`; } return`🤔 Samajh nahi aaya: "${msg.substring(0,50)}"<br/><small>Settings → OpenAI API Key add karo for full AI!</small>`; }
+async function localAI(msg){
+  const l = msg.toLowerCase();
+  const isLeaderOrAdmin = currentRole===ROLES.ADMIN||currentRole===ROLES.LEADER;
+
+  // Status / report
+  if(l.includes('status')||l.includes('report')||l.includes('kitne')||l.includes('summary')){
+    const done=allTasks.filter(t=>t.status==='done').length;
+    const inprog=allTasks.filter(t=>t.status==='inprogress').length;
+    const pending=allTasks.filter(t=>t.status==='pending').length;
+    return`📊 <strong>Team Status</strong><br/>Total: ${allTasks.length} | ✅ Done: ${done} | 🔄 In Progress: ${inprog} | ⏳ Pending: ${pending}<br/>Clients: ${allClients.length} | Members: ${allMembers.length}`;
+  }
+
+  // Members list
+  if((l.includes('member')||l.includes('team'))&&(l.includes('list')||l.includes('dikhao')||l.includes('show')||l.includes('kaun'))){
+    if(!allMembers.length) return`👥 Koi member nahi mila. Pehle member add karo.`;
+    return`👥 <strong>Team Members (${allMembers.length})</strong><br/>${allMembers.map((m,i)=>`${i+1}. ${m.name||m.email} <span style="color:var(--muted);font-size:11px">(${m.role})</span>`).join('<br/>')}`;
+  }
+
+  // Task assignment (leader/admin only)
+  if(isLeaderOrAdmin && (l.includes('task')||l.includes('assign')||l.includes('karo')||l.includes('do '))){
+    // Try to find member name in message
+    const foundMember = allMembers.find(m=>{
+      const name=(m.name||'').toLowerCase();
+      const email=(m.email||'').toLowerCase().split('@')[0];
+      return name && (l.includes(name)||l.includes(email));
+    });
+    if(!foundMember){
+      const memberNames = allMembers.length ? allMembers.map(m=>m.name||m.email).join(', ') : 'koi nahi';
+      return`❌ <strong>Member ka naam nahi mila.</strong><br/>Available members: ${memberNames}<br/><br/>Format: "<em>Rahul ko task do: printer install, due 30 June, high priority</em>"`;
+    }
+    // Extract task title after colon or "task:" or "ko task"
+    let title = '';
+    const colonIdx = msg.indexOf(':');
+    if(colonIdx>-1) title=msg.substring(colonIdx+1).trim().split(',')[0].trim();
+    if(!title){
+      const koTaskIdx = l.indexOf('ko task');
+      if(koTaskIdx>-1) title=msg.substring(koTaskIdx+7).replace(/assign|karo|do|kar/gi,'').trim().split(',')[0].trim();
+    }
+    if(!title) return`❌ Task title nahi mila.<br/>Format: "<em>${foundMember.name||foundMember.email} ko task do: <strong>task title yahan</strong>, due 30 June</em>"`;
+
+    // Extract due date
+    let dueDate='';
+    const dateMatch=msg.match(/(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|january|february|march|april|june|july|august|september|october|november|december)/i);
+    if(dateMatch){
+      const months={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12,january:1,february:2,march:3,april:4,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+      const day=parseInt(dateMatch[1]); const mon=months[dateMatch[2].substring(0,3).toLowerCase()];
+      if(mon){ const yr=new Date().getFullYear(); dueDate=`${yr}-${String(mon).padStart(2,'0')}-${String(day).padStart(2,'0')}`; }
+    }
+
+    // Extract priority
+    let priority='medium';
+    if(l.includes('high')||l.includes('urgent')||l.includes('important')) priority='high';
+    else if(l.includes('low')||l.includes('kam')) priority='low';
+
+    await dbPush('tasks',{title,desc:'',assigneeEmail:foundMember.email,assigneeName:foundMember.name||foundMember.email,priority,dueDate,status:'pending',teamId:currentTeamId||'',createdAt:Date.now(),createdBy:currentUser.email,createdByName:currentUser.displayName||currentUser.email,source:'ai-chat'});
+    return`✅ <strong>Task Assign Ho Gaya!</strong><br/>📋 <strong>${title}</strong><br/>👤 Assignee: ${foundMember.name||foundMember.email}<br/>🚨 Priority: ${priority}${dueDate?`<br/>📅 Due: ${dueDate}`:''}`;
+  }
+
+  return`🤔 Samajh nahi aaya: "${msg.substring(0,50)}"<br/><br/><small>💡 Try: "members dikhao", "team status", ya "Rahul ko task do: title"<br/>Ya Settings → OpenAI API Key add karo for full AI!</small>`;
+}
 
 // ── API Key & Settings ──
 async function loadApiKeyStatus(){ const d=await getApiKey(); const el=document.getElementById('apiKeyStatus'); if(!el)return; if(d){el.textContent='✅ Active';el.style.background='rgba(0,229,160,0.15)';el.style.color='var(--accent)';}else{el.textContent='Not Set';el.style.background='rgba(255,107,107,0.15)';el.style.color='#ff6b6b';} }
