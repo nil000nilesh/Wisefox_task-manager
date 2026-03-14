@@ -17,13 +17,14 @@ import { getFirestore,
 
 // ── CONFIG ──────────────────────────────────────────
 const firebaseConfig = {
-  apiKey:            "AIzaSyAKT-pTIOoJAML5WfR733IXle0l7hCwBeI",
-  authDomain:        "wisefox-1.firebaseapp.com",
-  projectId:         "wisefox-1",
-  storageBucket:     "wisefox-1.firebasestorage.app",
-  messagingSenderId: "524714148006",
-  appId:             "1:524714148006:web:d2799b38388b9577073467",
-  measurementId:     "G-D93REXPD6P"
+  apiKey:            "AIzaSyAP6xYAgWtU8hyuJP2nximxRZRIJnwNgG0",
+  authDomain:        "turning-point-task-manager.firebaseapp.com",
+  projectId:         "turning-point-task-manager",
+  databaseURL:       "https://turning-point-task-manager-default-rtdb.firebaseio.com",
+  storageBucket:     "turning-point-task-manager.firebasestorage.app",
+  messagingSenderId: "922397311479",
+  appId:             "1:922397311479:web:409b33be6ba412d01daef2",
+  measurementId:     "G-N4B2RJM9Z3"
 };
 
 const ADMIN_EMAIL     = "nil000nilesh@gmail.com";
@@ -522,30 +523,12 @@ function showLoginError(msg) {
 function buildAuthHelpMessage(code, fallbackMessage='Login failed') {
   const host = window.location.hostname;
   if (code === 'auth/unauthorized-domain') {
-    return `❌ Google login blocked for ${host}. Firebase Console → Authentication → Settings → Authorized domains mein ${host} aur aapka Vercel preview domain add karo.`;
+    return `❌ Domain unauthorized: ${host}. Firebase Console → Authentication → Settings → Authorized domains mein isi domain ko add karein.`;
   }
   if (code === 'auth/operation-not-allowed' || code === 'auth/configuration-not-found') {
-    return '❌ Firebase Google provider disabled lag raha hai. Authentication → Sign-in method → Google ko enable karo.';
-  }
-  if (code === 'auth/invalid-api-key' || code === 'auth/app-not-authorized') {
-    return '❌ Firebase web config/API key mismatch lag raha hai. Firebase project ke same Web App credentials use karo.';
+    return '❌ Google sign-in disabled lag raha hai. Firebase Authentication → Sign-in method mein Google provider enable karein.';
   }
   return fallbackMessage;
-}
-
-function shouldUseRedirectFallback(code) {
-  const redirectCodes = [
-    'auth/popup-blocked',
-    'auth/cancelled-popup-request',
-    'auth/operation-not-supported-in-this-environment',
-    'auth/web-storage-unsupported'
-  ];
-  return redirectCodes.includes(code);
-}
-
-async function beginRedirectLogin(txtEl) {
-  if(txtEl) txtEl.innerHTML='<strong>Redirecting...</strong><br/><small style="color:#6b7280">Opening Google sign-in page</small>';
-  await signInWithRedirect(auth,provider);
 }
 
 window.loginWithGoogle = async () => {
@@ -560,24 +543,14 @@ window.loginWithGoogle = async () => {
   try {
     await signInWithPopup(auth, provider);
   } catch(e) {
-    if (e.code==='auth/popup-closed-by-user') {
-      resetLoginBtn();
-      return;
+    if(['auth/popup-blocked','auth/cancelled-popup-request'].includes(e.code)) {
+      if(txt) txt.innerHTML='<strong>Redirecting...</strong>';
+      try{await signInWithRedirect(auth,provider);return;}catch(e2){showLoginError('Redirect failed: '+e2.message);}
+    } else if(e.code==='auth/popup-closed-by-user') { resetLoginBtn(); }
+    else {
+      const raw = e.message || e.code || 'Unknown error';
+      showLoginError(buildAuthHelpMessage(e.code, 'Login failed: ' + raw));
     }
-
-    if (shouldUseRedirectFallback(e.code)) {
-      try {
-        await beginRedirectLogin(txt);
-        return;
-      } catch (e2) {
-        const raw2 = e2.message || e2.code || 'Unknown redirect error';
-        showLoginError(buildAuthHelpMessage(e2.code, 'Redirect failed: ' + raw2));
-        return;
-      }
-    }
-
-    const raw = e.message || e.code || 'Unknown error';
-    showLoginError(buildAuthHelpMessage(e.code, 'Login failed: ' + raw));
   }
 };
 
