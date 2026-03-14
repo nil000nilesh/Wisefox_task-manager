@@ -159,6 +159,7 @@
       <div class="nav-section">My Workspace</div>
       <div class="nav-item" data-view="my-tasks" onclick="showView('my-tasks')"><span class="icon">📋</span>My Tasks <span class="nav-badge" id="myTaskBadge">0</span></div>
       <div class="nav-item" data-view="my-reminders" onclick="showView('my-reminders')"><span class="icon">🔔</span>Reminders <span class="nav-badge" id="myReminderBadge">0</span></div>
+      <div class="nav-item" data-view="notes" onclick="showView('notes')"><span class="icon">📓</span>My Notes</div>
       <div class="nav-item" data-view="my-progress" onclick="showView('my-progress')"><span class="icon">📈</span>My Progress</div>
     </div>
     <div class="sidebar-footer"><div class="nav-item" onclick="logout()"><span class="icon">🚪</span>Logout</div></div>
@@ -532,12 +533,43 @@
   </div>
 </div>
 
+<!-- IN-APP NOTIFICATION POPUP -->
+<div id="inAppNotifPanel" class="inapp-notif-panel" style="display:none">
+  <div class="inapp-notif-card" id="inAppNotifCard">
+    <div class="inapp-notif-left">
+      <div class="inapp-notif-icon-wrap" id="inAppNotifIconWrap">🔔</div>
+    </div>
+    <div class="inapp-notif-body">
+      <div class="inapp-notif-title" id="inAppNotifTitle">Notification</div>
+      <div class="inapp-notif-msg" id="inAppNotifMsg"></div>
+    </div>
+    <div class="inapp-notif-btns">
+      <button class="inapp-view-btn" id="inAppViewBtn" onclick="handleInAppAction()">View</button>
+      <button class="inapp-dismiss-btn" onclick="dismissInAppNotif()">✕</button>
+    </div>
+  </div>
+</div>
+
 <!-- FLOATING AI -->
 <button id="aiFloatBtn" onclick="openAIFloat()" title="AI Assistant">🤖</button>
 <div id="aiFloatChat">
-  <div class="float-header"><span>🤖</span><div class="float-header-title">TPS AI — Wisefox</div><button class="float-close" onclick="closeAIFloat()">✕</button></div>
+  <div class="float-header">
+    <span>🤖</span>
+    <div class="float-header-title">TPS AI — Wisefox</div>
+    <button class="float-close" onclick="closeAIFloat()">✕</button>
+  </div>
   <div class="float-messages" id="aiFloatMessages"></div>
-  <div class="float-input-row"><textarea class="float-input" id="aiFloatInput" placeholder="Command ya question..." onkeydown="aiFloatKeyDown(event)" rows="1"></textarea><button class="float-send" onclick="sendAIChat()">➤</button></div>
+  <!-- Quick action chips -->
+  <div class="ai-quick-chips" id="aiQuickChips">
+    <button class="ai-chip" onclick="aiQuickAction('task')">📋 Task</button>
+    <button class="ai-chip" onclick="aiQuickAction('reminder')">🔔 Reminder</button>
+    <button class="ai-chip" onclick="aiQuickAction('note')">📝 Note</button>
+    <button class="ai-chip" onclick="aiQuickAction('status')">📊 Status</button>
+  </div>
+  <div class="float-input-row">
+    <textarea class="float-input" id="aiFloatInput" placeholder="Yahan likho ya upar buttons use karo..." onkeydown="aiFloatKeyDown(event)" rows="1"></textarea>
+    <button class="float-send" onclick="sendAIChat()">➤</button>
+  </div>
 </div>
 
 <!-- PIN SETUP -->
